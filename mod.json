@@ -1,0 +1,26 @@
+{
+  "geode": "5.0.0",
+  "gd": {
+    "android": "2.2074"
+  },
+  "id": "user.frame-assist",
+  "name": "Frame Assist",
+  "version": "v0.2.0",
+  "developer": "user",
+  "description": "Asistencia de frame perfect: si mueres por fallar el timing por unos frames, reintenta el click desplazado.",
+  "settings": {
+    "stage": {
+      "type": "string",
+      "name": "Stage de ayuda",
+      "description": "Margen maximo en pasos de fisica (ticks) que puede moverse tu click. Off lo desactiva.",
+      "default": "2",
+      "one-of": [
+        "Off",
+        "2",
+        "4",
+        "8",
+        "16"
+      ]
+    }
+  }
+}
