@@ -1,4 +1,4 @@
-name: Build Frame Assist (Android)
+: Build Frame Assist (Android)
 
 on:
   workflow_dispatch:
