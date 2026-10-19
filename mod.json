@@ -1,7 +1,7 @@
 {
   "geode": "5.0.0",
   "gd": {
-    "android": "2.2074"
+    "android": "2.2081"
   },
   "id": "user.frame-assist",
   "name": "Frame Assist",
@@ -14,13 +14,7 @@
       "name": "Stage de ayuda",
       "description": "Margen maximo en pasos de fisica (ticks) que puede moverse tu click. Off lo desactiva.",
       "default": "2",
-      "one-of": [
-        "Off",
-        "2",
-        "4",
-        "8",
-        "16"
-      ]
+      "one-of": ["Off", "2", "4", "8", "16"]
     }
   }
 }
