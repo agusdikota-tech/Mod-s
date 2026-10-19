@@ -27,7 +27,7 @@ jobs:
         with:
           sdk: latest
           bindings: geode-sdk/bindings
-          bindings-ref: 1605f500
+          bindings-ref: codegen
           combine: true
           target: ${{ matrix.config.target }}
 
