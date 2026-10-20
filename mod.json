@@ -5,7 +5,7 @@
   },
   "id": "user.frame-assist",
   "name": "Frame Assist",
-  "version": "v0.3.0",
+  "version": "v0.6.0",
   "developer": "user",
   "description": "Asistencia de frame perfect: si mueres por fallar el timing por unos frames, reintenta el click desplazado.",
   "settings": {
@@ -15,6 +15,12 @@
       "description": "Margen maximo en pasos de fisica (ticks) que puede moverse tu click. Off lo desactiva.",
       "default": "2",
       "one-of": ["Off", "2", "4", "8", "16", "50"]
+    },
+    "smooth": {
+      "type": "bool",
+      "name": "Rescate suave (experimental)",
+      "description": "Rejuega el rebobinado dentro del mismo fotograma para que no se note el corte. Apagalo si algo va raro.",
+      "default": true
     }
   }
 }
