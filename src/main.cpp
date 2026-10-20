@@ -1,12 +1,12 @@
-// Frame Assist (v0.4, EXPERIMENTAL)
-// Snapshots espaciados (stride) para reducir tirones; rebobinado diferido al inicio
-// del siguiente paso; una sola etiqueta visible.
+// Frame Assist (v0.5, EXPERIMENTAL)
+// Rebobinado diferido + snapshots espaciados + contador visible de rescates.
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <deque>
 #include <vector>
 #include <algorithm>
+#include <cstdlib>
 
 using namespace geode::prelude;
 
@@ -20,6 +20,9 @@ namespace {
     int g_tries = 0;
     bool g_pending = false;
     int g_pendingStep = 0;
+    int g_curShift = 0;       // desplazamiento del intento actual
+    int g_rescues = 0;        // veces que la ayuda te salvo
+    int g_ticksSaved = 0;     // suma de ticks de error corregidos
     std::deque<Snap> g_snaps;
     std::vector<Ev> g_events;
     std::vector<Ev> g_replay;
@@ -30,10 +33,29 @@ namespace {
         return std::atoi(v.c_str());
     }
     bool on() { return tol() > 0; }
-    // separacion entre snapshots: 1 en stages bajos, mayor en altos (menos carga)
     int stride() {
         int t = tol();
         return t >= 16 ? std::max(1, t / 8) : 1;
+    }
+
+    std::string labelText() {
+        return fmt::format("Frame Assist: {} ticks | Rescates: {} ({} ticks)",
+                           tol(), g_rescues, g_ticksSaved);
+    }
+
+    void updateLabel(bool flash) {
+        auto pl = PlayLayer::get();
+        if (!pl) return;
+        auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-label"));
+        if (!lbl) return;
+        lbl->setString(labelText().c_str());
+        if (flash) {
+            lbl->stopAllActions();
+            lbl->setColor({90, 255, 90});
+            lbl->setScale(0.4f);
+            lbl->runAction(CCScaleTo::create(0.3f, 0.3f));
+            lbl->runAction(CCTintTo::create(0.6f, 255, 255, 255));
+        }
     }
 
     void clearAll() {
@@ -71,11 +93,18 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                 }
             }
 
-            // 2) reintento en curso, o snapshot normal (solo cada 'stride' pasos)
+            // 2) reintento en curso, o snapshot normal (cada 'stride' pasos)
             if (g_replaying) {
                 for (auto& e : g_replay)
                     if (e.step == g_step) GJBaseGameLayer::handleButton(e.down, 1, true);
-                if (g_step > g_replayEnd) g_replaying = false;
+                if (g_step > g_replayEnd) {
+                    // sobreviviste: rescate conseguido
+                    g_replaying = false;
+                    g_rescues++;
+                    g_ticksSaved += std::abs(g_curShift);
+                    g_tries = 0;
+                    updateLabel(true);
+                }
             } else if (g_step % stride() == 0) {
                 if (auto cp = pl->createCheckpoint()) {
                     cp->retain();
@@ -119,12 +148,14 @@ class $modify(FAPlayLayer, PlayLayer) {
 
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
+        g_rescues = 0;
+        g_ticksSaved = 0;
         // indicador siempre visible, una sola vez
         if (on() && !this->getChildByID("frame-assist-label")) {
-            auto lbl = CCLabelBMFont::create(fmt::format("Frame Assist: {} ticks", tol()).c_str(), "bigFont.fnt");
+            auto lbl = CCLabelBMFont::create(labelText().c_str(), "bigFont.fnt");
             lbl->setID("frame-assist-label");
             lbl->setScale(0.3f);
-            lbl->setOpacity(150);
+            lbl->setOpacity(170);
             lbl->setAnchorPoint({0.5f, 1.f});
             auto win = CCDirector::get()->getWinSize();
             lbl->setPosition({win.width / 2.f, win.height - 4.f});
@@ -174,6 +205,7 @@ class $modify(FAPlayLayer, PlayLayer) {
             if (e.step >= snapStep) g_replay.push_back(e);
         }
 
+        g_curShift = shift;
         g_pendingStep = snapStep;
         g_replayEnd = deathStep + 2;
         g_pending = true;
