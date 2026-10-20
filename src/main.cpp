@@ -1,4 +1,9 @@
-// Frame Assist (Stable Base Version)
+// Frame Assist (Stable + Show/Hide HUD + Android NDK Fix)
+#ifndef FMT_ENFORCE_COMPILE_STRING
+#define FMT_ENFORCE_COMPILE_STRING 0
+#endif
+#define FMT_NO_FMT_STRING
+
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -52,6 +57,7 @@ namespace {
     bool allowSpider() { return Mod::get()->getSettingValue<bool>("allow-spider"); }
     bool allowSwing() { return Mod::get()->getSettingValue<bool>("allow-swing"); }
     bool groundOnly() { return Mod::get()->getSettingValue<bool>("ground-only"); }
+    bool showHud()    { return Mod::get()->getSettingValue<bool>("show-hud"); }
 
     int stride() {
         int t = tol();
@@ -191,137 +197,11 @@ class $modify(FAPlayLayer, PlayLayer) {
             lbl->setAnchorPoint({0.5f, 1.f});
             lbl->setPosition({win.width / 2.f, win.height - 4.f});
             lbl->setZOrder(1000);
+            lbl->setVisible(showHud());
             this->addChild(lbl);
         }
     }
 
     void destroyPlayer(PlayerObject* player, GameObject* obj) {
-        if (!on() || obj == m_anticheatSpike || m_isPracticeMode) {
-            return PlayLayer::destroyPlayer(player, obj);
-        }
-
-        if (player && !modeAllowed(player)) {
-            return PlayLayer::destroyPlayer(player, obj);
-        }
-
-        if (g_replaying && g_step < g_origDeath) {
-            return;
-        }
-
-        if (g_snaps.empty()) {
-            return PlayLayer::destroyPlayer(player, obj);
-        }
-
-        int deathStep = g_step;
-        int clickStep;
-        if (g_chain) {
-            clickStep = g_origClick;
-        } else {
-            const Ev* last = nullptr;
-            for (auto& e : g_events) {
-                if (!e.down) continue;
-                if (deathStep - e.step <= 120) last = &e;
-            }
-            if (!last) {
-                return PlayLayer::destroyPlayer(player, obj);
-            }
-            clickStep = last->step;
-            g_origClick = clickStep;
-            g_origDeath = deathStep;
-            g_chain = true;
-            g_tries = 0;
-            g_useGround = groundOnly() || (m_player1 && !(m_player1->m_isShip || m_player1->m_isBird || m_player1->m_isDart || m_player1->m_isSwing) && groundAt(clickStep));
-        }
-
-        auto cands = candidates();
-        int maxAllowedTries = maxTriesSetting();
-        bool ok = false;
-        int newClick = 0, snapStep = 0;
-
-        while (g_tries < (int)cands.size() && g_tries < maxAllowedTries) {
-            int shift = cands[g_tries++];
-            newClick = clickStep + shift;
-            if (newClick >= g_origDeath) continue;
-            if (g_useGround && !groundAt(newClick)) continue;
-            int from = std::min(newClick, clickStep);
-            const Snap* best = nullptr;
-            for (auto& s : g_snaps)
-                if (s.step <= from && (!best || s.step > best->step)) best = &s;
-            if (!best) continue;
-            snapStep = best->step;
-            g_curShift = shift;
-            ok = true;
-            break;
-        }
-
-        if (!ok) {
-            clearAll();
-            return PlayLayer::destroyPlayer(player, obj);
-        }
-
-        int origUp = -1, nextDown = -1;
-        for (auto& e : g_events) {
-            if (e.step <= clickStep) continue;
-            if (!e.down && origUp < 0) origUp = e.step;
-            if (e.down && nextDown < 0) nextDown = e.step;
-        }
-
-        CheckpointObject* target = nullptr;
-        for (auto& s : g_snaps) if (s.step == snapStep) target = s.cp;
-        if (!target) {
-            return PlayLayer::destroyPlayer(player, obj);
-        }
-
-        target->retain();
-        this->loadFromCheckpoint(target);
-        
-        while (!g_snaps.empty() && g_snaps.back().step >= snapStep) {
-            g_snaps.back().cp->release();
-            g_snaps.pop_back();
-        }
-        while (!g_ground.empty() && g_ground.back().first >= snapStep) g_ground.pop_back();
-        target->release();
-
-        g_step = snapStep;
-        g_replaying = true;
-        g_watching = false;
-
-        g_replay.clear();
-        g_replay.push_back({newClick, true});
-        if (origUp >= 0) {
-            int newUp = origUp + g_curShift;
-            if (nextDown >= 0 && newUp >= nextDown) newUp = nextDown - 1;
-            if (newUp <= newClick) newUp = newClick + 1;
-            g_replay.push_back({newUp, false});
-        }
-        for (auto& e : g_events) {
-            if (e.step < snapStep) continue;
-            if (e.down && e.step == clickStep) continue;
-            if (!e.down && e.step == origUp) continue;
-            g_replay.push_back(e);
-        }
-
-        g_replayEnd = g_origDeath + surviveTicks();
-
-        if (m_player1) {
-            m_player1->m_isDead = false;
-            m_player1->m_isDashing = false;
-            m_player1->setVisible(true);
-        }
-        if (m_player2) {
-            m_player2->m_isDead = false;
-            m_player2->m_isDashing = false;
-            m_player2->setVisible(true);
-        }
-    }
-};
-
-class $modify(FAPlayerObject, PlayerObject) {
-    bool collidedWithObject(float dt, GameObject* obj) {
-        if (on() && g_replaying) {
-            return PlayerObject::collidedWithObject(dt, obj);
-        }
-        return PlayerObject::collidedWithObject(dt, obj);
-    }
-};
- 
+        if (!on() || obj == m_anticheatSp
+            
