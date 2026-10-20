@@ -1,4 +1,4 @@
-// Frame Assist (v0.8.8, EXPERIMENTAL - Blindaje Antimuertes)
+// Frame Assist (v0.8.9, EXPERIMENTAL - Corrección de Firma)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -258,8 +258,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             return PlayLayer::destroyPlayer(player, obj);
         }
 
-        // Si estamos rejugando y el juego intenta matar al jugador antes de llegar al punto original,
-        // bloqueamos la muerte temporalmente para permitir que el nuevo input surta efecto.
         if (g_replaying && g_step < g_origDeath) {
             return;
         }
@@ -349,11 +347,11 @@ class $modify(FAPlayLayer, PlayLayer) {
 };
 
 class $modify(FAPlayerObject, PlayerObject) {
-    void collidedWithObject(float p0, GameObject* p1, bool p2) {
+    // Firma corregida a 2 argumentos (dt y object) según los bindings de Geode
+    bool collidedWithObject(float dt, GameObject* obj) {
         if (on() && g_replaying) {
-            PlayerObject::collidedWithObject(p0, p1, p2);
-            return;
+            return PlayerObject::collidedWithObject(dt, obj);
         }
-        PlayerObject::collidedWithObject(p0, p1, p2);
+        return PlayerObject::collidedWithObject(dt, obj);
     }
 };
