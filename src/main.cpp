@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.6 - Stable Clean Build)
+// Frame Assist (v0.9.7 - Clean Android Build)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -93,8 +93,7 @@ namespace {
     std::string labelText() {
         std::string s = "Frame Assist: ";
         s.append(std::to_string(tol()));
-        s.append(" ticks | Rescates: ");
-        s.append(std::to_string(g_rescues));
+        s.append(" ticks");
         return s;
     }
 
