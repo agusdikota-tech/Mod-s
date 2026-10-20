@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.3 - Android Pure C++ String Fix)
+// Frame Assist (v0.9.4 - Ultimate Android Build Fix)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -92,12 +92,12 @@ namespace {
 
     std::string labelText() {
         std::string s = "Frame Assist: ";
-        s += std::to_string(tol());
-        s += " ticks | Rescates: ";
-        s += std::to_string(g_rescues);
-        s += " (";
-        s += std::to_string(g_ticksSaved);
-        s += " ticks)";
+        s.append(std::to_string(tol()));
+        s.append(" ticks | Rescates: ");
+        s.append(std::to_string(g_rescues));
+        s.append(" (");
+        s.append(std::to_string(g_ticksSaved));
+        s.append(" ticks)");
         return s;
     }
 
@@ -278,8 +278,8 @@ class $modify(FAPlayLayer, PlayLayer) {
             }
             if (!last) {
                 std::string errNear = "muerte sin click cercano (prox: ";
-                errNear += std::to_string(nearest);
-                errNear += ")";
+                errNear.append(std::to_string(nearest));
+                errNear.append(")");
                 setDbg(errNear);
                 return PlayLayer::destroyPlayer(player, obj);
             }
@@ -319,13 +319,13 @@ class $modify(FAPlayLayer, PlayLayer) {
         }
 
         std::string dbgTry = "intento ";
-        dbgTry += std::to_string(g_tries);
-        dbgTry += "/";
-        dbgTry += std::to_string((int)cands.size());
-        dbgTry += ": click ";
-        if (g_curShift > 0) dbgTry += "+";
-        dbgTry += std::to_string(g_curShift);
-        dbgTry += " ticks";
+        dbgTry.append(std::to_string(g_tries));
+        dbgTry.append("/");
+        dbgTry.append(std::to_string((int)cands.size()));
+        dbgTry.append(": click ");
+        if (g_curShift > 0) dbgTry.append("+");
+        dbgTry.append(std::to_string(g_curShift));
+        dbgTry.append(" ticks");
         setDbg(dbgTry);
 
         int origUp = -1, nextDown = -1;
@@ -394,4 +394,3 @@ class $modify(FAPlayerObject, PlayerObject) {
         return PlayerObject::collidedWithObject(dt, obj);
     }
 };
-    
