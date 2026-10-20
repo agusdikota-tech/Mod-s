@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.1, MEGA UPDATE - HUD Limpio y Filtros)
+// Frame Assist (v0.9.1 - Fix FMT Android Build)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -8,6 +8,7 @@
 #include <utility>
 #include <algorithm>
 #include <cstdlib>
+#include <string>
 
 using namespace geode::prelude;
 
@@ -53,7 +54,7 @@ namespace {
     bool allowSpider() { return Mod::get()->getSettingValue<bool>("allow-spider"); }
     bool allowSwing() { return Mod::get()->getSettingValue<bool>("allow-swing"); }
     bool groundOnly() { return Mod::get()->getSettingValue<bool>("ground-only"); }
-    bool showHud()    { return Mod::get()->getSettingValue<bool>("show-hud"); } // Nuevo ajuste para ocultar textos
+    bool showHud()    { return Mod::get()->getSettingValue<bool>("show-hud"); }
 
     int stride() {
         int t = tol();
@@ -90,8 +91,8 @@ namespace {
     }
 
     std::string labelText() {
-        return fmt::format("Frame Assist: {} ticks | Rescates: {} ({} ticks)",
-                           tol(), g_rescues, g_ticksSaved);
+        return "Frame Assist: " + std::to_string(tol()) + " ticks | Rescates: " + 
+               std::to_string(g_rescues) + " (" + std::to_string(g_ticksSaved) + " ticks)";
     }
 
     void setDbg(const std::string& s) {
@@ -270,7 +271,7 @@ class $modify(FAPlayLayer, PlayLayer) {
                 if (deathStep - e.step <= 120) last = &e;
             }
             if (!last) {
-                setDbg(fmt::format("muerte sin click cercano (prox: {})", nearest));
+                setDbg("muerte sin click cercano (prox: " + std::to_string(nearest) + ")");
                 return PlayLayer::destroyPlayer(player, obj);
             }
             clickStep = last->step;
@@ -308,7 +309,9 @@ class $modify(FAPlayLayer, PlayLayer) {
             return PlayLayer::destroyPlayer(player, obj);
         }
 
-        setDbg(fmt::format("intento {}/{}: click {:+} ticks", g_tries, (int)cands.size(), g_curShift));
+        std::string sign = (g_curShift > 0) ? "+" : "";
+        setDbg("intento " + std::to_string(g_tries) + "/" + std::to_string((int)cands.size()) + 
+               ": click " + sign + std::to_string(g_curShift) + " ticks");
 
         int origUp = -1, nextDown = -1;
         for (auto& e : g_events) {
