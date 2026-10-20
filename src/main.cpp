@@ -1,12 +1,13 @@
-// Frame Assist (v0.2, EXPERIMENTAL, sin probar en dispositivo)
-// Idea: guardamos snapshots de los ultimos pasos de fisica. Si mueres poco despues
-// de un click, volvemos a un snapshot anterior y reintentamos el click desplazado
-// (-1, +1, -2, +2... pasos). Si ninguno sobrevive, mueres normal.
+// Frame Assist (v0.3, EXPERIMENTAL)
+// Guardamos snapshots de los ultimos pasos de fisica. Si mueres poco despues de un
+// click, anotamos el rebobinado y lo hacemos al INICIO del siguiente paso (momento
+// seguro), reintentando el click desplazado (-1, +1, -2, +2... pasos).
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <deque>
 #include <vector>
+#include <algorithm>
 
 using namespace geode::prelude;
 
@@ -18,9 +19,11 @@ namespace {
     bool g_replaying = false;
     int g_replayEnd = 0;
     int g_tries = 0;
+    bool g_pending = false;      // hay un rebobinado pendiente
+    int g_pendingStep = 0;       // paso del snapshot al que volver
     std::deque<Snap> g_snaps;
-    std::vector<Ev> g_events;   // clicks reales del jugador (recientes)
-    std::vector<Ev> g_replay;   // clicks a inyectar durante el reintento
+    std::vector<Ev> g_events;    // clicks reales del jugador
+    std::vector<Ev> g_replay;    // clicks a inyectar durante el reintento
 
     int tol() {
         auto v = Mod::get()->getSettingValue<std::string>("stage");
@@ -31,15 +34,40 @@ namespace {
 
     void clearAll() {
         for (auto& s : g_snaps) if (s.cp) s.cp->release();
-        g_snaps.clear(); g_events.clear(); g_replay.clear();
-        g_step = 0; g_tries = 0; g_replaying = false;
+        g_snaps.clear();
+        g_events.clear();
+        g_replay.clear();
+        g_step = 0;
+        g_tries = 0;
+        g_replaying = false;
+        g_pending = false;
     }
 }
 
 class $modify(FAGameLayer, GJBaseGameLayer) {
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         auto pl = PlayLayer::get();
-        if (pl && on() && !m_player1->m_isDead) {
+        if (pl && on() && !pl->m_isPracticeMode && m_player1 && !m_player1->m_isDead) {
+
+            // 1) rebobinado pendiente: se hace aqui, al inicio del paso (seguro)
+            if (g_pending) {
+                g_pending = false;
+                CheckpointObject* target = nullptr;
+                for (auto& s : g_snaps) if (s.step == g_pendingStep) target = s.cp;
+                if (target) {
+                    target->retain();
+                    pl->loadFromCheckpoint(target);
+                    while (!g_snaps.empty() && g_snaps.back().step >= g_pendingStep) {
+                        g_snaps.back().cp->release();
+                        g_snaps.pop_back();
+                    }
+                    target->release();
+                    g_step = g_pendingStep;
+                    g_replaying = true;
+                }
+            }
+
+            // 2) reintento en curso: inyectar el click desplazado / snapshot normal
             if (g_replaying) {
                 for (auto& e : g_replay)
                     if (e.step == g_step) GJBaseGameLayer::handleButton(e.down, 1, true);
@@ -61,10 +89,9 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
     }
 
     void handleButton(bool down, int button, bool isPlayer1) {
-        // durante un reintento ignoramos el input real (lo inyectamos nosotros)
+        // durante un reintento ignoramos el input real (lo inyectamos nosotros,
+        // llamando directo a GJBaseGameLayer::handleButton, que no pasa por este hook)
         if (on() && g_replaying && PlayLayer::get()) {
-            // las inyecciones propias llaman a GJBaseGameLayer::handleButton directo
-            // y no pasan por este hook, asi que aqui solo llegan clicks reales
             return;
         }
         if (on() && button == 1 && isPlayer1) g_events.push_back({g_step, down});
@@ -76,6 +103,16 @@ class $modify(FAPlayLayer, PlayLayer) {
     void resetLevel() {
         clearAll();
         PlayLayer::resetLevel();
+    }
+
+    void onQuit() {
+        clearAll();
+        PlayLayer::onQuit();
+    }
+
+    void levelComplete() {
+        clearAll();
+        PlayLayer::levelComplete();
     }
 
     void setupHasCompleted() {
@@ -97,6 +134,8 @@ class $modify(FAPlayLayer, PlayLayer) {
         if (!on() || obj == m_anticheatSpike || m_isPracticeMode || g_snaps.empty()) {
             return PlayLayer::destroyPlayer(player, obj);
         }
+        // ya hay un rebobinado anotado en este paso: ignorar muertes repetidas
+        if (g_pending) return;
 
         // ultimo click (down) cercano a la muerte
         int deathStep = g_step;
@@ -117,11 +156,10 @@ class $modify(FAPlayLayer, PlayLayer) {
         int newClick = last->step + shift;
         int from = std::min(newClick, last->step);
 
-        // buscar snapshot en 'from'
-        CheckpointObject* target = nullptr;
-        int targetStep = 0;
-        for (auto& s : g_snaps) if (s.step == from) { target = s.cp; targetStep = s.step; }
-        if (!target || newClick >= deathStep) {
+        // existe snapshot en 'from'?
+        bool found = false;
+        for (auto& s : g_snaps) if (s.step == from) found = true;
+        if (!found || newClick >= deathStep) {
             return PlayLayer::destroyPlayer(player, obj);
         }
 
@@ -132,16 +170,10 @@ class $modify(FAPlayLayer, PlayLayer) {
             if (e.step > last->step || (e.step == last->step && !e.down))
                 g_replay.push_back(e);
 
-        // descartar snapshots/eventos desde el punto de rebobinado
-        while (!g_snaps.empty() && g_snaps.back().step >= targetStep) {
-            g_snaps.back().cp->release();
-            g_snaps.pop_back();
-        }
-        g_step = targetStep;
+        // anotar el rebobinado; se ejecuta al inicio del siguiente paso
+        g_pendingStep = from;
         g_replayEnd = deathStep + 2;
-        g_replaying = true;
-
-        PlayLayer::loadFromCheckpoint(target);
-        // no llamamos al destroyPlayer original: reintentamos
+        g_pending = true;
+        // no llamamos al destroyPlayer original: el jugador no muere, se rebobina
     }
 };
