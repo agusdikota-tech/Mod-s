@@ -1,4 +1,4 @@
-// Frame Assist (v0.8.4, EXPERIMENTAL)
+// Frame Assist (v0.8.5, EXPERIMENTAL - Completo)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -122,7 +122,6 @@ namespace {
         g_replaying = true;
         g_watching = false;
 
-        // Limpiar estado de muerte para evitar conflictos con las físicas
         if (pl->m_player1) pl->m_player1->m_isDead = false;
         if (pl->m_player2) pl->m_player2->m_isDead = false;
 
@@ -158,7 +157,8 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                     setDbg("sobrevives... vigilando");
                 }
             } else {
-                if (g_step % stride() == 0) {
+                // Guardar snapshot de forma temprana desde el tick 0 o según el stride
+                if (g_step == 0 || g_step % stride() == 0) {
                     if (auto cp = pl->createCheckpoint()) {
                         cp->retain();
                         g_snaps.push_back({g_step, cp});
@@ -259,10 +259,11 @@ class $modify(FAPlayLayer, PlayLayer) {
             for (auto& e : g_events) {
                 if (!e.down) continue;
                 nearest = std::min(nearest, deathStep - e.step);
-                if (deathStep - e.step <= tol() * 2 + 2) last = &e;
+                // Ampliando ventana para evitar "muerte sin click cercano"
+                if (deathStep - e.step <= 120) last = &e;
             }
             if (!last) {
-                setDbg("muerte sin click cercano");
+                setDbg(fmt::format("muerte sin click cercano (prox: {})", nearest));
                 return PlayLayer::destroyPlayer(player, obj);
             }
             clickStep = last->step;
