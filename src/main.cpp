@@ -324,3 +324,4 @@ class $modify(FAPlayerObject, PlayerObject) {
         return PlayerObject::collidedWithObject(dt, obj);
     }
 };
+ 
