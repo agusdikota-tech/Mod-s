@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.0, MEGA UPDATE - Opciones de Testeo Avanzadas)
+// Frame Assist (v0.9.1, MEGA UPDATE - HUD Limpio y Filtros)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -33,7 +33,7 @@ namespace {
     std::vector<Ev> g_events;
     std::vector<Ev> g_replay;
 
-    // --- Lecturas de los Nuevos Ajustes de Geode ---
+    // --- Lecturas de los Ajustes de Geode ---
     int tol() {
         auto v = Mod::get()->getSettingValue<std::string>("stage");
         if (v == "Off") return 0;
@@ -53,6 +53,7 @@ namespace {
     bool allowSpider() { return Mod::get()->getSettingValue<bool>("allow-spider"); }
     bool allowSwing() { return Mod::get()->getSettingValue<bool>("allow-swing"); }
     bool groundOnly() { return Mod::get()->getSettingValue<bool>("ground-only"); }
+    bool showHud()    { return Mod::get()->getSettingValue<bool>("show-hud"); } // Nuevo ajuste para ocultar textos
 
     int stride() {
         int t = tol();
@@ -97,8 +98,9 @@ namespace {
         g_dbg = s;
         auto pl = PlayLayer::get();
         if (!pl) return;
-        if (auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-dbg")))
-            lbl->setString(s.c_str());
+        if (auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-dbg"))) {
+            lbl->setString(showHud() ? s.c_str() : "");
+        }
     }
 
     void updateLabel(bool flash) {
@@ -106,8 +108,8 @@ namespace {
         if (!pl) return;
         auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-label"));
         if (!lbl) return;
-        lbl->setString(labelText().c_str());
-        if (flash) {
+        lbl->setString(showHud() ? labelText().c_str() : "");
+        if (flash && showHud()) {
             lbl->stopAllActions();
             lbl->setColor({90, 255, 90});
             lbl->setScale(0.4f);
@@ -216,7 +218,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         if (on() && !this->getChildByID("frame-assist-label")) {
             auto win = CCDirector::get()->getWinSize();
 
-            auto lbl = CCLabelBMFont::create(labelText().c_str(), "bigFont.fnt");
+            auto lbl = CCLabelBMFont::create(showHud() ? labelText().c_str() : "", "bigFont.fnt");
             lbl->setID("frame-assist-label");
             lbl->setScale(0.3f);
             lbl->setOpacity(170);
@@ -225,7 +227,7 @@ class $modify(FAPlayLayer, PlayLayer) {
             lbl->setZOrder(1000);
             this->addChild(lbl);
 
-            auto dbg = CCLabelBMFont::create(g_dbg.c_str(), "bigFont.fnt");
+            auto dbg = CCLabelBMFont::create(showHud() ? g_dbg.c_str() : "", "bigFont.fnt");
             dbg->setID("frame-assist-dbg");
             dbg->setScale(0.25f);
             dbg->setOpacity(200);
@@ -242,7 +244,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             return PlayLayer::destroyPlayer(player, obj);
         }
 
-        // Filtro por tipo de vehículo activo
         if (player && !modeAllowed(player)) {
             return PlayLayer::destroyPlayer(player, obj);
         }
@@ -316,7 +317,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             if (e.down && nextDown < 0) nextDown = e.step;
         }
 
-        // --- REQUISICIÓN SÍNCRONA INSTANTÁNEA (Cero Cortes) ---
         CheckpointObject* target = nullptr;
         for (auto& s : g_snaps) if (s.step == snapStep) target = s.cp;
         if (!target) {
