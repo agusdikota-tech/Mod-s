@@ -1,26 +1,83 @@
 {
-  "geode": "5.11.2",
-  "gd": {
-    "android": "2.2081"
-  },
-  "id": "user.frame-assist",
-  "name": "Frame Assist",
-  "version": "v0.9.0",
-  "developer": "user",
-  "description": "Asistencia de frame perfect: si mueres por fallar el timing por unos frames, reintenta el click desplazado.",
-  "settings": {
-    "stage": {
-      "type": "string",
-      "name": "Stage de ayuda",
-      "description": "Margen maximo en pasos de fisica (ticks) que puede moverse tu click. Off lo desactiva.",
-      "default": "2",
-      "one-of": ["Off", "2", "4", "8", "16", "50"]
-    },
-    "debug": {
-      "type": "bool",
-      "name": "Linea de diagnostico",
-      "description": "Muestra en pantalla que hace el mod cuando mueres.",
-      "default": false
-    }
-  }
+	"geode": "4.0.0",
+	"gd": {
+		"win": "2.2074",
+		"android": "2.2074",
+		"mac": "2.2074"
+	},
+	"id": "tu_usuario.frame_assist",
+	"name": "Frame Assist",
+	"version": "v0.9.1",
+	"developer": "TuNombre",
+	"description": "Asistente de precision y ajuste fino de ticks de salto para Geometry Dash.",
+	"settings": {
+		"stage": {
+			"name": "Ticks de Tolerancia",
+			"description": "Rango de ticks a probar para salvar el salto (Off para desactivar).",
+			"type": "string",
+			"default": "16"
+		},
+		"show-hud": {
+			"name": "Mostrar Textos (HUD)",
+			"description": "Activa o desactiva la informacion en pantalla (rescates, estado, etc.) mientras juegas.",
+			"type": "bool",
+			"default": true
+		},
+		"max-tries": {
+			"name": "Limite de Intentos",
+			"description": "Maximo de combinaciones de ticks a probar por rescate.",
+			"type": "int",
+			"default": 32,
+			"min": 1,
+			"max": 100
+		},
+		"ground-only": {
+			"name": "Solo en Suelo",
+			"description": "Restringe el asistente unicamente a saltos desde el suelo.",
+			"type": "bool",
+			"default": false
+		},
+		"allow-ship": {
+			"name": "Permitir Nave",
+			"description": "Activa o desactiva la asistencia durante el modo Nave.",
+			"type": "bool",
+			"default": true
+		},
+		"allow-ball": {
+			"name": "Permitir Bola",
+			"description": "Activa o desactiva la asistencia durante el modo Bola.",
+			"type": "bool",
+			"default": true
+		},
+		"allow-ufo": {
+			"name": "Permitir UFO",
+			"description": "Activa o desactiva la asistencia durante el modo UFO.",
+			"type": "bool",
+			"default": true
+		},
+		"allow-wave": {
+			"name": "Permitir Wave",
+			"description": "Activa o desactiva la asistencia durante el modo Wave / Onda.",
+			"type": "bool",
+			"default": true
+		},
+		"allow-robot": {
+			"name": "Permitir Robot",
+			"description": "Activa o desactiva la asistencia durante el modo Robot.",
+			"type": "bool",
+			"default": true
+		},
+		"allow-spider": {
+			"name": "Permitir Araña",
+			"description": "Activa o desactiva la asistencia durante el modo Araña.",
+			"type": "bool",
+			"default": true
+		},
+		"allow-swing": {
+			"name": "Permitir Swing",
+			"description": "Activa o desactiva la asistencia durante el modo Swing.",
+			"type": "bool",
+			"default": true
+		}
+	}
 }
