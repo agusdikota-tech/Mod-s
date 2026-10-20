@@ -1,4 +1,4 @@
-// Frame Assist (Stable + Show/Hide HUD)
+// Frame Assist (v0.9.8 - Android Safe Build)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -28,7 +28,6 @@ namespace {
     int g_curShift = 0;
     int g_rescues = 0;
     int g_ticksSaved = 0;
-    std::string g_dbg = "esperando";
     std::deque<Snap> g_snaps;
     std::deque<std::pair<int, bool>> g_ground;
     std::vector<Ev> g_events;
@@ -90,19 +89,11 @@ namespace {
         return true;
     }
 
-    std::string labelText() {
-        std::string s = "Frame Assist: ";
-        s.append(std::to_string(tol()));
-        s.append(" ticks");
-        return s;
-    }
-
-    void setDbg(const std::string& s) {
-        g_dbg = s;
+    void setDbg(const char* text) {
         auto pl = PlayLayer::get();
         if (!pl) return;
         if (auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-dbg"))) {
-            lbl->setString(showHud() ? s.c_str() : "");
+            lbl->setString(showHud() ? text : "");
         }
     }
 
@@ -111,7 +102,7 @@ namespace {
         if (!pl) return;
         auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-label"));
         if (!lbl) return;
-        lbl->setString(showHud() ? labelText().c_str() : "");
+        lbl->setString(showHud() ? "Frame Assist Active" : "");
         if (flash && showHud()) {
             lbl->stopAllActions();
             lbl->setColor({90, 255, 90});
@@ -221,7 +212,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         if (on() && !this->getChildByID("frame-assist-label")) {
             auto win = CCDirector::get()->getWinSize();
 
-            auto lbl = CCLabelBMFont::create(showHud() ? labelText().c_str() : "", "bigFont.fnt");
+            auto lbl = CCLabelBMFont::create(showHud() ? "Frame Assist Active" : "", "bigFont.fnt");
             lbl->setID("frame-assist-label");
             lbl->setScale(0.3f);
             lbl->setOpacity(170);
@@ -230,7 +221,7 @@ class $modify(FAPlayLayer, PlayLayer) {
             lbl->setZOrder(1000);
             this->addChild(lbl);
 
-            auto dbg = CCLabelBMFont::create(showHud() ? g_dbg.c_str() : "", "bigFont.fnt");
+            auto dbg = CCLabelBMFont::create(showHud() ? "esperando" : "", "bigFont.fnt");
             dbg->setID("frame-assist-dbg");
             dbg->setScale(0.25f);
             dbg->setOpacity(200);
