@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.1 - Fix FMT Android Build)
+// Frame Assist (v0.9.3 - Android Pure C++ String Fix)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -91,8 +91,14 @@ namespace {
     }
 
     std::string labelText() {
-        return "Frame Assist: " + std::to_string(tol()) + " ticks | Rescates: " + 
-               std::to_string(g_rescues) + " (" + std::to_string(g_ticksSaved) + " ticks)";
+        std::string s = "Frame Assist: ";
+        s += std::to_string(tol());
+        s += " ticks | Rescates: ";
+        s += std::to_string(g_rescues);
+        s += " (";
+        s += std::to_string(g_ticksSaved);
+        s += " ticks)";
+        return s;
     }
 
     void setDbg(const std::string& s) {
@@ -271,7 +277,10 @@ class $modify(FAPlayLayer, PlayLayer) {
                 if (deathStep - e.step <= 120) last = &e;
             }
             if (!last) {
-                setDbg("muerte sin click cercano (prox: " + std::to_string(nearest) + ")");
+                std::string errNear = "muerte sin click cercano (prox: ";
+                errNear += std::to_string(nearest);
+                errNear += ")";
+                setDbg(errNear);
                 return PlayLayer::destroyPlayer(player, obj);
             }
             clickStep = last->step;
@@ -309,9 +318,15 @@ class $modify(FAPlayLayer, PlayLayer) {
             return PlayLayer::destroyPlayer(player, obj);
         }
 
-        std::string sign = (g_curShift > 0) ? "+" : "";
-        setDbg("intento " + std::to_string(g_tries) + "/" + std::to_string((int)cands.size()) + 
-               ": click " + sign + std::to_string(g_curShift) + " ticks");
+        std::string dbgTry = "intento ";
+        dbgTry += std::to_string(g_tries);
+        dbgTry += "/";
+        dbgTry += std::to_string((int)cands.size());
+        dbgTry += ": click ";
+        if (g_curShift > 0) dbgTry += "+";
+        dbgTry += std::to_string(g_curShift);
+        dbgTry += " ticks";
+        setDbg(dbgTry);
 
         int origUp = -1, nextDown = -1;
         for (auto& e : g_events) {
@@ -379,3 +394,4 @@ class $modify(FAPlayerObject, PlayerObject) {
         return PlayerObject::collidedWithObject(dt, obj);
     }
 };
+    
