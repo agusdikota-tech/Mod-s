@@ -1,6 +1,6 @@
-// Frame Assist (v0.7, EXPERIMENTAL)
-// Rebobinado diferido, intentos acotados sobre el mismo click original, y un rescate
-// solo cuenta si sobrevives un rato despues del punto de la muerte.
+// Frame Assist (v0.8, EXPERIMENTAL)
+// Rebobinado diferido a velocidad normal (sin acelerar el juego), intentos acotados sobre
+// el mismo click original, y un rescate solo cuenta si sobrevives ~0,5 s despues.
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -28,8 +28,6 @@ namespace {
     int g_curShift = 0;
     int g_rescues = 0;
     int g_ticksSaved = 0;
-    int g_calls = 0;
-    double g_rate = 240.0;
     std::deque<Snap> g_snaps;
     std::vector<Ev> g_events;   // clicks reales del jugador
     std::vector<Ev> g_replay;   // clicks a inyectar en la fase A
@@ -40,12 +38,11 @@ namespace {
         return std::atoi(v.c_str());
     }
     bool on() { return tol() > 0; }
-    bool smooth() { return Mod::get()->getSettingValue<bool>("smooth"); }
     int stride() {
         int t = tol();
         return t >= 16 ? std::max(1, t / 8) : 1;
     }
-    int surviveTicks() { return std::max(24, tol() * 2 + 8); }
+    int surviveTicks() { return std::max(120, tol() * 4); }
 
     // desplazamientos a probar, en orden: -1,+1,-2,+2,... (acotados)
     std::vector<int> candidates() {
@@ -110,29 +107,18 @@ namespace {
 }
 
 class $modify(FAGameLayer, GJBaseGameLayer) {
+    // Inicio del fotograma: momento seguro para rebobinar. NO se altera dt,
+    // asi el juego no se acelera: el rejugado ocurre a velocidad normal.
     void update(float dt) {
         auto pl = PlayLayer::get();
-        bool catchUp = false;
         if (pl && on() && g_pending && m_player1 && !m_player1->m_isDead && !pl->m_isPracticeMode) {
             g_pending = false;
-            int span = g_origDeath - g_pendingStep;
-            if (doRewind(pl) && smooth() && span > 0 && g_rate > 1.0) {
-                float extra = (float)(span / g_rate);
-                if (extra <= 0.3f) {
-                    dt += extra;
-                    catchUp = true;
-                }
-            }
+            doRewind(pl);
         }
-        g_calls = 0;
         GJBaseGameLayer::update(dt);
-        if (!catchUp && dt > 0.f && g_calls > 0) {
-            g_rate = g_rate * 0.95 + (g_calls / (double)dt) * 0.05;
-        }
     }
 
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
-        g_calls++;
         auto pl = PlayLayer::get();
         if (pl && on() && !pl->m_isPracticeMode && m_player1 && !m_player1->m_isDead) {
             if (g_replaying) {
