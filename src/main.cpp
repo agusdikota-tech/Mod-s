@@ -1,4 +1,4 @@
-// Frame Assist (v0.1, EXPERIMENTAL, sin probar en dispositivo)
+// Frame Assist (v0.2, EXPERIMENTAL, sin probar en dispositivo)
 // Idea: guardamos snapshots de los ultimos pasos de fisica. Si mueres poco despues
 // de un click, volvemos a un snapshot anterior y reintentamos el click desplazado
 // (-1, +1, -2, +2... pasos). Si ninguno sobrevive, mueres normal.
@@ -37,7 +37,7 @@ namespace {
 }
 
 class $modify(FAGameLayer, GJBaseGameLayer) {
-    void processCommands(float dt) {
+    void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         auto pl = PlayLayer::get();
         if (pl && on() && !m_player1->m_isDead) {
             if (g_replaying) {
@@ -57,7 +57,7 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
             }
             g_step++;
         }
-        GJBaseGameLayer::processCommands(dt);
+        GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
     }
 
     void handleButton(bool down, int button, bool isPlayer1) {
