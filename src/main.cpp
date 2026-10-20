@@ -1,4 +1,4 @@
-// Frame Assist (v0.8.9, EXPERIMENTAL - Corrección de Firma)
+// Frame Assist (v0.9.0, MEGA UPDATE - Opciones de Testeo Avanzadas)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -24,8 +24,6 @@ namespace {
     bool g_useGround = false;
     int g_origClick = 0;
     int g_origDeath = 0;
-    bool g_pending = false;
-    int g_pendingStep = 0;
     int g_curShift = 0;
     int g_rescues = 0;
     int g_ticksSaved = 0;
@@ -35,12 +33,27 @@ namespace {
     std::vector<Ev> g_events;
     std::vector<Ev> g_replay;
 
+    // --- Lecturas de los Nuevos Ajustes de Geode ---
     int tol() {
         auto v = Mod::get()->getSettingValue<std::string>("stage");
         if (v == "Off") return 0;
         return std::atoi(v.c_str());
     }
     bool on() { return tol() > 0; }
+
+    int maxTriesSetting() {
+        return (int)Mod::get()->getSettingValue<int64_t>("max-tries");
+    }
+
+    bool allowShip() { return Mod::get()->getSettingValue<bool>("allow-ship"); }
+    bool allowBall() { return Mod::get()->getSettingValue<bool>("allow-ball"); }
+    bool allowUfo()  { return Mod::get()->getSettingValue<bool>("allow-ufo"); }
+    bool allowWave() { return Mod::get()->getSettingValue<bool>("allow-wave"); }
+    bool allowRobot() { return Mod::get()->getSettingValue<bool>("allow-robot"); }
+    bool allowSpider() { return Mod::get()->getSettingValue<bool>("allow-spider"); }
+    bool allowSwing() { return Mod::get()->getSettingValue<bool>("allow-swing"); }
+    bool groundOnly() { return Mod::get()->getSettingValue<bool>("ground-only"); }
+
     int stride() {
         int t = tol();
         return t >= 16 ? std::max(1, t / 12) : 1;
@@ -62,8 +75,17 @@ namespace {
         for (auto& g : g_ground) if (g.first == step) return g.second;
         return true;
     }
-    bool groundMode(PlayerObject* p) {
-        return !(p->m_isShip || p->m_isBird || p->m_isDart || p->m_isSwing);
+
+    bool modeAllowed(PlayerObject* p) {
+        if (!p) return true;
+        if (p->m_isShip && !allowShip()) return false;
+        if (p->m_isBall && !allowBall()) return false;
+        if (p->m_isBird && !allowUfo()) return false;
+        if (p->m_isDart && !allowWave()) return false;
+        if (p->m_isRobot && !allowRobot()) return false;
+        if (p->m_isSpider && !allowSpider()) return false;
+        if (p->m_isSwing && !allowSwing()) return false;
+        return true;
     }
 
     std::string labelText() {
@@ -105,48 +127,10 @@ namespace {
         g_chain = false;
         g_replaying = false;
         g_watching = false;
-        g_pending = false;
-    }
-
-    bool doRewind(PlayLayer* pl) {
-        CheckpointObject* target = nullptr;
-        for (auto& s : g_snaps) if (s.step == g_pendingStep) target = s.cp;
-        if (!target) return false;
-        target->retain();
-        pl->loadFromCheckpoint(target);
-        while (!g_snaps.empty() && g_snaps.back().step >= g_pendingStep) {
-            g_snaps.back().cp->release();
-            g_snaps.pop_back();
-        }
-        while (!g_ground.empty() && g_ground.back().first >= g_pendingStep) g_ground.pop_back();
-        target->release();
-        g_step = g_pendingStep;
-        g_replaying = true;
-        g_watching = false;
-
-        if (pl->m_player1) {
-            pl->m_player1->m_isDead = false;
-            pl->m_player1->m_isDashing = false;
-        }
-        if (pl->m_player2) {
-            pl->m_player2->m_isDead = false;
-            pl->m_player2->m_isDashing = false;
-        }
-
-        return true;
     }
 }
 
 class $modify(FAGameLayer, GJBaseGameLayer) {
-    void update(float dt) {
-        auto pl = PlayLayer::get();
-        if (pl && on() && g_pending && m_player1 && !pl->m_isPracticeMode) {
-            g_pending = false;
-            if (!doRewind(pl)) setDbg("fallo: no habia snapshot para volver");
-        }
-        GJBaseGameLayer::update(dt);
-    }
-
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         auto pl = PlayLayer::get();
         if (pl && on() && !pl->m_isPracticeMode && m_player1) {
@@ -258,6 +242,11 @@ class $modify(FAPlayLayer, PlayLayer) {
             return PlayLayer::destroyPlayer(player, obj);
         }
 
+        // Filtro por tipo de vehículo activo
+        if (player && !modeAllowed(player)) {
+            return PlayLayer::destroyPlayer(player, obj);
+        }
+
         if (g_replaying && g_step < g_origDeath) {
             return;
         }
@@ -266,7 +255,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             setDbg("sin snapshots guardados");
             return PlayLayer::destroyPlayer(player, obj);
         }
-        if (g_pending) return;
 
         int deathStep = g_step;
         int clickStep;
@@ -289,13 +277,15 @@ class $modify(FAPlayLayer, PlayLayer) {
             g_origDeath = deathStep;
             g_chain = true;
             g_tries = 0;
-            g_useGround = m_player1 && groundMode(m_player1) && groundAt(clickStep);
+            g_useGround = groundOnly() || (m_player1 && !(m_player1->m_isShip || m_player1->m_isBird || m_player1->m_isDart || m_player1->m_isSwing) && groundAt(clickStep));
         }
 
         auto cands = candidates();
+        int maxAllowedTries = maxTriesSetting();
         bool ok = false;
         int newClick = 0, snapStep = 0;
-        while (g_tries < (int)cands.size()) {
+
+        while (g_tries < (int)cands.size() && g_tries < maxAllowedTries) {
             int shift = cands[g_tries++];
             newClick = clickStep + shift;
             if (newClick >= g_origDeath) continue;
@@ -310,6 +300,7 @@ class $modify(FAPlayLayer, PlayLayer) {
             ok = true;
             break;
         }
+
         if (!ok) {
             setDbg("sin solucion tras intentos");
             clearAll();
@@ -324,6 +315,28 @@ class $modify(FAPlayLayer, PlayLayer) {
             if (!e.down && origUp < 0) origUp = e.step;
             if (e.down && nextDown < 0) nextDown = e.step;
         }
+
+        // --- REQUISICIÓN SÍNCRONA INSTANTÁNEA (Cero Cortes) ---
+        CheckpointObject* target = nullptr;
+        for (auto& s : g_snaps) if (s.step == snapStep) target = s.cp;
+        if (!target) {
+            setDbg("fallo: checkpoint no encontrado");
+            return PlayLayer::destroyPlayer(player, obj);
+        }
+
+        target->retain();
+        this->loadFromCheckpoint(target);
+        
+        while (!g_snaps.empty() && g_snaps.back().step >= snapStep) {
+            g_snaps.back().cp->release();
+            g_snaps.pop_back();
+        }
+        while (!g_ground.empty() && g_ground.back().first >= snapStep) g_ground.pop_back();
+        target->release();
+
+        g_step = snapStep;
+        g_replaying = true;
+        g_watching = false;
 
         g_replay.clear();
         g_replay.push_back({newClick, true});
@@ -340,14 +353,22 @@ class $modify(FAPlayLayer, PlayLayer) {
             g_replay.push_back(e);
         }
 
-        g_pendingStep = snapStep;
         g_replayEnd = g_origDeath + surviveTicks();
-        g_pending = true;
+
+        if (m_player1) {
+            m_player1->m_isDead = false;
+            m_player1->m_isDashing = false;
+            m_player1->setVisible(true);
+        }
+        if (m_player2) {
+            m_player2->m_isDead = false;
+            m_player2->m_isDashing = false;
+            m_player2->setVisible(true);
+        }
     }
 };
 
 class $modify(FAPlayerObject, PlayerObject) {
-    // Firma corregida a 2 argumentos (dt y object) según los bindings de Geode
     bool collidedWithObject(float dt, GameObject* obj) {
         if (on() && g_replaying) {
             return PlayerObject::collidedWithObject(dt, obj);
