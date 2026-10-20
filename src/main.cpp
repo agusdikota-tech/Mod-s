@@ -1,7 +1,8 @@
-// Frame Assist (v0.8.5, EXPERIMENTAL - Completo)
+// Frame Assist (v0.8.8, EXPERIMENTAL - Blindaje Antimuertes)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
+#include <Geode/modify/PlayerObject.hpp>
 #include <deque>
 #include <vector>
 #include <utility>
@@ -42,15 +43,16 @@ namespace {
     bool on() { return tol() > 0; }
     int stride() {
         int t = tol();
-        return t >= 16 ? std::max(1, t / 8) : 1;
+        return t >= 16 ? std::max(1, t / 12) : 1;
     }
     int surviveTicks() { return std::max(120, tol() * 4); }
 
     std::vector<int> candidates() {
         std::vector<int> mags;
         int t = tol();
-        for (int m = 1; m <= std::min(t, 6); m++) mags.push_back(m);
-        for (int m : {8, 12, 16, 24, 32, 50}) if (m <= t) mags.push_back(m);
+        for (int m = 1; m <= t; m++) {
+            mags.push_back(m);
+        }
         std::vector<int> out;
         for (int m : mags) { out.push_back(-m); out.push_back(m); }
         return out;
@@ -122,8 +124,14 @@ namespace {
         g_replaying = true;
         g_watching = false;
 
-        if (pl->m_player1) pl->m_player1->m_isDead = false;
-        if (pl->m_player2) pl->m_player2->m_isDead = false;
+        if (pl->m_player1) {
+            pl->m_player1->m_isDead = false;
+            pl->m_player1->m_isDashing = false;
+        }
+        if (pl->m_player2) {
+            pl->m_player2->m_isDead = false;
+            pl->m_player2->m_isDashing = false;
+        }
 
         return true;
     }
@@ -132,7 +140,7 @@ namespace {
 class $modify(FAGameLayer, GJBaseGameLayer) {
     void update(float dt) {
         auto pl = PlayLayer::get();
-        if (pl && on() && g_pending && m_player1 && !m_player1->m_isDead && !pl->m_isPracticeMode) {
+        if (pl && on() && g_pending && m_player1 && !pl->m_isPracticeMode) {
             g_pending = false;
             if (!doRewind(pl)) setDbg("fallo: no habia snapshot para volver");
         }
@@ -141,7 +149,7 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
 
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         auto pl = PlayLayer::get();
-        if (pl && on() && !pl->m_isPracticeMode && m_player1 && !m_player1->m_isDead) {
+        if (pl && on() && !pl->m_isPracticeMode && m_player1) {
             g_ground.push_back({g_step, (bool)m_player1->m_isOnGround});
             while (g_ground.size() > 600) g_ground.pop_front();
 
@@ -149,7 +157,14 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                 for (auto& e : g_replay)
                     if (e.step == g_step) GJBaseGameLayer::handleButton(e.down, 1, true);
 
-                if (m_player1) m_player1->m_isDead = false;
+                if (m_player1) {
+                    m_player1->m_isDead = false;
+                    m_player1->m_isDashing = false;
+                }
+                if (m_player2) {
+                    m_player2->m_isDead = false;
+                    m_player2->m_isDashing = false;
+                }
 
                 if (g_step >= g_origDeath) {
                     g_replaying = false;
@@ -157,7 +172,6 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                     setDbg("sobrevives... vigilando");
                 }
             } else {
-                // Guardar snapshot de forma temprana desde el tick 0 o según el stride
                 if (g_step == 0 || g_step % stride() == 0) {
                     if (auto cp = pl->createCheckpoint()) {
                         cp->retain();
@@ -243,6 +257,13 @@ class $modify(FAPlayLayer, PlayLayer) {
         if (!on() || obj == m_anticheatSpike || m_isPracticeMode) {
             return PlayLayer::destroyPlayer(player, obj);
         }
+
+        // Si estamos rejugando y el juego intenta matar al jugador antes de llegar al punto original,
+        // bloqueamos la muerte temporalmente para permitir que el nuevo input surta efecto.
+        if (g_replaying && g_step < g_origDeath) {
+            return;
+        }
+
         if (g_snaps.empty()) {
             setDbg("sin snapshots guardados");
             return PlayLayer::destroyPlayer(player, obj);
@@ -259,7 +280,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             for (auto& e : g_events) {
                 if (!e.down) continue;
                 nearest = std::min(nearest, deathStep - e.step);
-                // Ampliando ventana para evitar "muerte sin click cercano"
                 if (deathStep - e.step <= 120) last = &e;
             }
             if (!last) {
@@ -325,5 +345,15 @@ class $modify(FAPlayLayer, PlayLayer) {
         g_pendingStep = snapStep;
         g_replayEnd = g_origDeath + surviveTicks();
         g_pending = true;
+    }
+};
+
+class $modify(FAPlayerObject, PlayerObject) {
+    void collidedWithObject(float p0, GameObject* p1, bool p2) {
+        if (on() && g_replaying) {
+            PlayerObject::collidedWithObject(p0, p1, p2);
+            return;
+        }
+        PlayerObject::collidedWithObject(p0, p1, p2);
     }
 };
