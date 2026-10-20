@@ -1,4 +1,6 @@
-// Frame Assist (v0.9.4 - Ultimate Android Build Fix)
+// Frame Assist (v0.9.5 - Android NDK FMT Macro Fix)
+#define FMT_HEADER_ONLY
+
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
