@@ -1,6 +1,4 @@
-// Frame Assist (v0.9.5 - Android NDK FMT Macro Fix)
-#define FMT_HEADER_ONLY
-
+// Frame Assist (v0.9.6 - Stable Clean Build)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -97,9 +95,6 @@ namespace {
         s.append(std::to_string(tol()));
         s.append(" ticks | Rescates: ");
         s.append(std::to_string(g_rescues));
-        s.append(" (");
-        s.append(std::to_string(g_ticksSaved));
-        s.append(" ticks)");
         return s;
     }
 
@@ -164,7 +159,7 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                 if (g_step >= g_origDeath) {
                     g_replaying = false;
                     g_watching = true;
-                    setDbg("sobrevives... vigilando");
+                    setDbg("vigilando");
                 }
             } else {
                 if (g_step == 0 || g_step % stride() == 0) {
@@ -185,7 +180,7 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                     g_rescues++;
                     g_ticksSaved += std::abs(g_curShift);
                     updateLabel(true);
-                    setDbg("rescate!");
+                    setDbg("rescate exitoso");
                 }
             }
             g_step++;
@@ -262,7 +257,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         }
 
         if (g_snaps.empty()) {
-            setDbg("sin snapshots guardados");
+            setDbg("sin snapshots");
             return PlayLayer::destroyPlayer(player, obj);
         }
 
@@ -272,17 +267,12 @@ class $modify(FAPlayLayer, PlayLayer) {
             clickStep = g_origClick;
         } else {
             const Ev* last = nullptr;
-            int nearest = 99999;
             for (auto& e : g_events) {
                 if (!e.down) continue;
-                nearest = std::min(nearest, deathStep - e.step);
                 if (deathStep - e.step <= 120) last = &e;
             }
             if (!last) {
-                std::string errNear = "muerte sin click cercano (prox: ";
-                errNear.append(std::to_string(nearest));
-                errNear.append(")");
-                setDbg(errNear);
+                setDbg("sin click cercano");
                 return PlayLayer::destroyPlayer(player, obj);
             }
             clickStep = last->step;
@@ -315,20 +305,12 @@ class $modify(FAPlayLayer, PlayLayer) {
         }
 
         if (!ok) {
-            setDbg("sin solucion tras intentos");
+            setDbg("sin solucion");
             clearAll();
             return PlayLayer::destroyPlayer(player, obj);
         }
 
-        std::string dbgTry = "intento ";
-        dbgTry.append(std::to_string(g_tries));
-        dbgTry.append("/");
-        dbgTry.append(std::to_string((int)cands.size()));
-        dbgTry.append(": click ");
-        if (g_curShift > 0) dbgTry.append("+");
-        dbgTry.append(std::to_string(g_curShift));
-        dbgTry.append(" ticks");
-        setDbg(dbgTry);
+        setDbg("reintentando salto");
 
         int origUp = -1, nextDown = -1;
         for (auto& e : g_events) {
@@ -340,7 +322,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         CheckpointObject* target = nullptr;
         for (auto& s : g_snaps) if (s.step == snapStep) target = s.cp;
         if (!target) {
-            setDbg("fallo: checkpoint no encontrado");
+            setDbg("checkpoint no hallado");
             return PlayLayer::destroyPlayer(player, obj);
         }
 
