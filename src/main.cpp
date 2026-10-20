@@ -1,7 +1,6 @@
-// Frame Assist (v0.8.3, EXPERIMENTAL)
-// Rebobinado diferido. Los desplazamientos de click solo se prueban en ticks en los que
-// estabas en el suelo (cubo/bola/robot/araña) si el click original fue desde el suelo.
-// Se desplaza tambien el soltado. Incluye linea de diagnostico en pantalla.
+// Frame Assist (v0.9, EXPERIMENTAL)
+// Rebobinado diferido a velocidad normal, solo en ticks de suelo (modos de suelo),
+// soltado desplazado junto al click, limite de seguridad, diagnostico opcional.
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -17,23 +16,26 @@ struct Ev { int step; bool down; };
 struct Snap { int step; CheckpointObject* cp; };
 
 namespace {
+    constexpr int kMaxRewindsPerAttempt = 60;
+
     int g_step = 0;
     bool g_replaying = false;
     bool g_watching = false;
     int g_replayEnd = 0;
     int g_tries = 0;
     bool g_chain = false;
-    bool g_useGround = false;   // restringir desplazamientos a ticks en el suelo
+    bool g_useGround = false;
     int g_origClick = 0;
     int g_origDeath = 0;
     bool g_pending = false;
     int g_pendingStep = 0;
     int g_curShift = 0;
+    int g_rewinds = 0;          // rebobinados en este intento (limite de seguridad)
     int g_rescues = 0;
     int g_ticksSaved = 0;
     std::string g_dbg = "esperando";
     std::deque<Snap> g_snaps;
-    std::deque<std::pair<int, bool>> g_ground;   // (paso, estaba en el suelo)
+    std::deque<std::pair<int, bool>> g_ground;   // (paso, en el suelo)
     std::vector<Ev> g_events;
     std::vector<Ev> g_replay;
 
@@ -43,6 +45,7 @@ namespace {
         return std::atoi(v.c_str());
     }
     bool on() { return tol() > 0; }
+    bool dbgOn() { return Mod::get()->getSettingValue<bool>("debug"); }
     int stride() {
         int t = tol();
         return t >= 16 ? std::max(1, t / 8) : 1;
@@ -59,12 +62,10 @@ namespace {
         return out;
     }
 
-    // true si en ese paso estabas en el suelo (o si no lo sabemos: no bloquear)
     bool groundAt(int step) {
         for (auto& g : g_ground) if (g.first == step) return g.second;
-        return true;
+        return true;   // si no lo sabemos, no bloquear
     }
-    // modos en los que el click solo cuenta desde el suelo
     bool groundMode(PlayerObject* p) {
         return !(p->m_isShip || p->m_isBird || p->m_isDart || p->m_isSwing);
     }
@@ -126,11 +127,14 @@ namespace {
         g_step = g_pendingStep;
         g_replaying = true;
         g_watching = false;
+        g_rewinds++;
         return true;
     }
 }
 
 class $modify(FAGameLayer, GJBaseGameLayer) {
+    // Inicio del fotograma: momento seguro para rebobinar. No se toca dt:
+    // el rejugado ocurre a velocidad normal, sin aceleracion.
     void update(float dt) {
         auto pl = PlayLayer::get();
         if (pl && on() && g_pending && m_player1 && !m_player1->m_isDead && !pl->m_isPracticeMode) {
@@ -143,9 +147,8 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         auto pl = PlayLayer::get();
         if (pl && on() && !pl->m_isPracticeMode && m_player1 && !m_player1->m_isDead) {
-            // anotar si estas en el suelo en este paso
             g_ground.push_back({g_step, (bool)m_player1->m_isOnGround});
-            while (g_ground.size() > 600) g_ground.pop_front();
+            while (g_ground.size() > 300) g_ground.pop_front();
 
             if (g_replaying) {
                 for (auto& e : g_replay)
@@ -199,6 +202,7 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
 class $modify(FAPlayLayer, PlayLayer) {
     void resetLevel() {
         clearAll();
+        g_rewinds = 0;
         PlayLayer::resetLevel();
     }
 
@@ -216,6 +220,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         PlayLayer::setupHasCompleted();
         g_rescues = 0;
         g_ticksSaved = 0;
+        g_rewinds = 0;
         if (on() && !this->getChildByID("frame-assist-label")) {
             auto win = CCDirector::get()->getWinSize();
 
@@ -228,15 +233,17 @@ class $modify(FAPlayLayer, PlayLayer) {
             lbl->setZOrder(1000);
             this->addChild(lbl);
 
-            auto dbg = CCLabelBMFont::create(g_dbg.c_str(), "bigFont.fnt");
-            dbg->setID("frame-assist-dbg");
-            dbg->setScale(0.25f);
-            dbg->setOpacity(200);
-            dbg->setColor({255, 220, 90});
-            dbg->setAnchorPoint({0.5f, 1.f});
-            dbg->setPosition({win.width / 2.f, win.height - 18.f});
-            dbg->setZOrder(1000);
-            this->addChild(dbg);
+            if (dbgOn()) {
+                auto dbg = CCLabelBMFont::create(g_dbg.c_str(), "bigFont.fnt");
+                dbg->setID("frame-assist-dbg");
+                dbg->setScale(0.25f);
+                dbg->setOpacity(200);
+                dbg->setColor({255, 220, 90});
+                dbg->setAnchorPoint({0.5f, 1.f});
+                dbg->setPosition({win.width / 2.f, win.height - 18.f});
+                dbg->setZOrder(1000);
+                this->addChild(dbg);
+            }
         }
     }
 
@@ -246,6 +253,10 @@ class $modify(FAPlayLayer, PlayLayer) {
         }
         if (g_snaps.empty()) {
             setDbg("sin snapshots guardados");
+            return PlayLayer::destroyPlayer(player, obj);
+        }
+        if (g_rewinds >= kMaxRewindsPerAttempt) {
+            setDbg("limite de seguridad alcanzado en este intento");
             return PlayLayer::destroyPlayer(player, obj);
         }
         if (g_pending) return;
@@ -272,7 +283,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             g_origDeath = deathStep;
             g_chain = true;
             g_tries = 0;
-            // restringir a ticks en el suelo solo si el click original fue desde el suelo
             g_useGround = m_player1 && groundMode(m_player1) && groundAt(clickStep);
         }
 
@@ -304,7 +314,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         setDbg(fmt::format("intento {}/{}: click {:+} ticks{}", g_tries, (int)cands.size(), g_curShift,
                            g_useGround ? " [suelo]" : ""));
 
-        // --- construir el replay ---
+        // --- construir el replay: click desplazado + soltado desplazado igual ---
         int origUp = -1, nextDown = -1;
         for (auto& e : g_events) {
             if (e.step <= clickStep) continue;
