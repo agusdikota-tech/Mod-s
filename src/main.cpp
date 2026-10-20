@@ -1,5 +1,5 @@
-// Frame Assist (v0.5, EXPERIMENTAL)
-// Rebobinado diferido + snapshots espaciados + contador visible de rescates.
+// Frame Assist (v0.6, EXPERIMENTAL)
+// Rebobinado y rejugado en el MISMO fotograma (sin corte visible) + contador de rescates.
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -19,10 +19,13 @@ namespace {
     int g_replayEnd = 0;
     int g_tries = 0;
     bool g_pending = false;
-    int g_pendingStep = 0;
-    int g_curShift = 0;       // desplazamiento del intento actual
-    int g_rescues = 0;        // veces que la ayuda te salvo
-    int g_ticksSaved = 0;     // suma de ticks de error corregidos
+    int g_pendingStep = 0;     // paso del snapshot al que volver
+    int g_pendingDeath = 0;    // paso en el que moriste
+    int g_curShift = 0;
+    int g_rescues = 0;
+    int g_ticksSaved = 0;
+    int g_calls = 0;           // llamadas a processCommands en este fotograma
+    double g_rate = 240.0;     // llamadas por segundo (se mide solo)
     std::deque<Snap> g_snaps;
     std::vector<Ev> g_events;
     std::vector<Ev> g_replay;
@@ -33,6 +36,7 @@ namespace {
         return std::atoi(v.c_str());
     }
     bool on() { return tol() > 0; }
+    bool smooth() { return Mod::get()->getSettingValue<bool>("smooth"); }
     int stride() {
         int t = tol();
         return t >= 16 ? std::max(1, t / 8) : 1;
@@ -68,32 +72,51 @@ namespace {
         g_replaying = false;
         g_pending = false;
     }
+
+    // vuelve al snapshot pendiente; devuelve false si no existe
+    bool doRewind(PlayLayer* pl) {
+        CheckpointObject* target = nullptr;
+        for (auto& s : g_snaps) if (s.step == g_pendingStep) target = s.cp;
+        if (!target) return false;
+        target->retain();
+        pl->loadFromCheckpoint(target);
+        while (!g_snaps.empty() && g_snaps.back().step >= g_pendingStep) {
+            g_snaps.back().cp->release();
+            g_snaps.pop_back();
+        }
+        target->release();
+        g_step = g_pendingStep;
+        g_replaying = true;
+        return true;
+    }
 }
 
 class $modify(FAGameLayer, GJBaseGameLayer) {
+    // Inicio del fotograma: aqui es seguro rebobinar y, si "suave" esta activo,
+    // sumamos al dt el tiempo de los ticks rebobinados para rejugarlos ya mismo.
+    void update(float dt) {
+        auto pl = PlayLayer::get();
+        bool catchUp = false;
+        if (pl && on() && g_pending && m_player1 && !m_player1->m_isDead && !pl->m_isPracticeMode) {
+            g_pending = false;
+            int span = g_pendingDeath - g_pendingStep;
+            if (doRewind(pl) && smooth() && span > 0 && g_rate > 1.0) {
+                dt += (float)(span / g_rate);
+                catchUp = true;
+            }
+        }
+        g_calls = 0;
+        GJBaseGameLayer::update(dt);
+        // medir cuantas llamadas por segundo hace el juego (no en el fotograma de recuperacion)
+        if (!catchUp && dt > 0.f && g_calls > 0) {
+            g_rate = g_rate * 0.95 + (g_calls / (double)dt) * 0.05;
+        }
+    }
+
     void processCommands(float dt, bool isHalfTick, bool isLastTick) {
+        g_calls++;
         auto pl = PlayLayer::get();
         if (pl && on() && !pl->m_isPracticeMode && m_player1 && !m_player1->m_isDead) {
-
-            // 1) rebobinado pendiente (al inicio del paso, momento seguro)
-            if (g_pending) {
-                g_pending = false;
-                CheckpointObject* target = nullptr;
-                for (auto& s : g_snaps) if (s.step == g_pendingStep) target = s.cp;
-                if (target) {
-                    target->retain();
-                    pl->loadFromCheckpoint(target);
-                    while (!g_snaps.empty() && g_snaps.back().step >= g_pendingStep) {
-                        g_snaps.back().cp->release();
-                        g_snaps.pop_back();
-                    }
-                    target->release();
-                    g_step = g_pendingStep;
-                    g_replaying = true;
-                }
-            }
-
-            // 2) reintento en curso, o snapshot normal (cada 'stride' pasos)
             if (g_replaying) {
                 for (auto& e : g_replay)
                     if (e.step == g_step) GJBaseGameLayer::handleButton(e.down, 1, true);
@@ -207,8 +230,9 @@ class $modify(FAPlayLayer, PlayLayer) {
 
         g_curShift = shift;
         g_pendingStep = snapStep;
+        g_pendingDeath = deathStep;
         g_replayEnd = deathStep + 2;
         g_pending = true;
-        // no llamamos al destroyPlayer original: se rebobina en el siguiente paso
+        // no llamamos al destroyPlayer original: se rebobina al inicio del siguiente fotograma
     }
 };
