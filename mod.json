@@ -1,81 +1,85 @@
 {
 	"geode": "4.0.0",
-	"gd": {
-		"win": "2.2074",
-		"android": "2.2074",
-		"mac": "2.2074"
-	},
-	"id": "tu_usuario.frame_assist",
-	"name": "Frame Assist",
 	"version": "v0.9.1",
+	"id": "tu.frame-assist",
+	"name": "Frame Assist",
 	"developer": "TuNombre",
-	"description": "Asistente de precision y ajuste fino de ticks de salto para Geometry Dash.",
+	"description": "Ayuda con frames y reintentos automáticos para Geometry Dash.",
 	"settings": {
 		"stage": {
-			"name": "Ticks de Tolerancia",
-			"description": "Rango de ticks a probar para salvar el salto (Off para desactivar).",
+			"name": "Tolerancia (Frames)",
+			"description": "Número máximo de ticks de tolerancia para ajustar el salto.",
 			"type": "string",
-			"default": "16"
-		},
-		"show-hud": {
-			"name": "Mostrar Textos (HUD)",
-			"description": "Activa o desactiva la informacion en pantalla (rescates, estado, etc.) mientras juegas.",
-			"type": "bool",
-			"default": true
+			"default": "16",
+			"options": [
+				"Off",
+				"4",
+				"8",
+				"12",
+				"16",
+				"24",
+				"32"
+			]
 		},
 		"max-tries": {
-			"name": "Limite de Intentos",
-			"description": "Maximo de combinaciones de ticks a probar por rescate.",
+			"name": "Intentos Máximos",
+			"description": "Límite de intentos de reescritura por muerte.",
 			"type": "int",
-			"default": 32,
+			"default": 16,
 			"min": 1,
-			"max": 100
-		},
-		"ground-only": {
-			"name": "Solo en Suelo",
-			"description": "Restringe el asistente unicamente a saltos desde el suelo.",
-			"type": "bool",
-			"default": false
+			"max": 64
 		},
 		"allow-ship": {
-			"name": "Permitir Nave",
-			"description": "Activa o desactiva la asistencia durante el modo Nave.",
+			"name": "Permitir en Nave",
+			"description": "Activar Frame Assist con la nave.",
 			"type": "bool",
 			"default": true
 		},
 		"allow-ball": {
-			"name": "Permitir Bola",
-			"description": "Activa o desactiva la asistencia durante el modo Bola.",
+			"name": "Permitir en Bola",
+			"description": "Activar Frame Assist con la bola.",
 			"type": "bool",
 			"default": true
 		},
 		"allow-ufo": {
-			"name": "Permitir UFO",
-			"description": "Activa o desactiva la asistencia durante el modo UFO.",
+			"name": "Permitir en OVNI",
+			"description": "Activar Frame Assist con el OVNI.",
 			"type": "bool",
 			"default": true
 		},
 		"allow-wave": {
-			"name": "Permitir Wave",
-			"description": "Activa o desactiva la asistencia durante el modo Wave / Onda.",
+			"name": "Permitir en Wave",
+			"description": "Activar Frame Assist con el wave.",
 			"type": "bool",
 			"default": true
 		},
 		"allow-robot": {
-			"name": "Permitir Robot",
-			"description": "Activa o desactiva la asistencia durante el modo Robot.",
+			"name": "Permitir en Robot",
+			"description": "Activar Frame Assist con el robot.",
 			"type": "bool",
 			"default": true
 		},
 		"allow-spider": {
-			"name": "Permitir Araña",
-			"description": "Activa o desactiva la asistencia durante el modo Araña.",
+			"name": "Permitir en Araña",
+			"description": "Activar Frame Assist con la araña.",
 			"type": "bool",
 			"default": true
 		},
 		"allow-swing": {
-			"name": "Permitir Swing",
-			"description": "Activa o desactiva la asistencia durante el modo Swing.",
+			"name": "Permitir en Swing",
+			"description": "Activar Frame Assist con el swing copter.",
+			"type": "bool",
+			"default": true
+		},
+		"ground-only": {
+			"name": "Solo en el Suelo",
+			"description": "Restringir los saltos ajustados a cuando el jugador pisa el suelo.",
+			"type": "bool",
+			"default": false
+		},
+		"show-hud": {
+			"name": "Mostrar HUD",
+			"description": "Muestra u oculta la información en pantalla del mod.",
 			"type": "bool",
 			"default": true
 		}
