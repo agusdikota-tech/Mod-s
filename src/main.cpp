@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.7 - Clean Android Build)
+// Frame Assist (Stable + Show/Hide HUD)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
