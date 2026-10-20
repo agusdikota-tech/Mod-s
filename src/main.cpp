@@ -1,4 +1,4 @@
-// Frame Assist (v0.9.8 - Android Safe Build)
+// Frame Assist (Stable Base Version)
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
@@ -8,7 +8,6 @@
 #include <utility>
 #include <algorithm>
 #include <cstdlib>
-#include <string>
 
 using namespace geode::prelude;
 
@@ -53,7 +52,6 @@ namespace {
     bool allowSpider() { return Mod::get()->getSettingValue<bool>("allow-spider"); }
     bool allowSwing() { return Mod::get()->getSettingValue<bool>("allow-swing"); }
     bool groundOnly() { return Mod::get()->getSettingValue<bool>("ground-only"); }
-    bool showHud()    { return Mod::get()->getSettingValue<bool>("show-hud"); }
 
     int stride() {
         int t = tol();
@@ -87,29 +85,6 @@ namespace {
         if (p->m_isSpider && !allowSpider()) return false;
         if (p->m_isSwing && !allowSwing()) return false;
         return true;
-    }
-
-    void setDbg(const char* text) {
-        auto pl = PlayLayer::get();
-        if (!pl) return;
-        if (auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-dbg"))) {
-            lbl->setString(showHud() ? text : "");
-        }
-    }
-
-    void updateLabel(bool flash) {
-        auto pl = PlayLayer::get();
-        if (!pl) return;
-        auto lbl = typeinfo_cast<CCLabelBMFont*>(pl->getChildByID("frame-assist-label"));
-        if (!lbl) return;
-        lbl->setString(showHud() ? "Frame Assist Active" : "");
-        if (flash && showHud()) {
-            lbl->stopAllActions();
-            lbl->setColor({90, 255, 90});
-            lbl->setScale(0.4f);
-            lbl->runAction(CCScaleTo::create(0.3f, 0.3f));
-            lbl->runAction(CCTintTo::create(0.6f, 255, 255, 255));
-        }
     }
 
     void clearAll() {
@@ -149,7 +124,6 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                 if (g_step >= g_origDeath) {
                     g_replaying = false;
                     g_watching = true;
-                    setDbg("vigilando");
                 }
             } else {
                 if (g_step == 0 || g_step % stride() == 0) {
@@ -169,8 +143,6 @@ class $modify(FAGameLayer, GJBaseGameLayer) {
                     g_tries = 0;
                     g_rescues++;
                     g_ticksSaved += std::abs(g_curShift);
-                    updateLabel(true);
-                    setDbg("rescate exitoso");
                 }
             }
             g_step++;
@@ -212,7 +184,7 @@ class $modify(FAPlayLayer, PlayLayer) {
         if (on() && !this->getChildByID("frame-assist-label")) {
             auto win = CCDirector::get()->getWinSize();
 
-            auto lbl = CCLabelBMFont::create(showHud() ? "Frame Assist Active" : "", "bigFont.fnt");
+            auto lbl = CCLabelBMFont::create("Frame Assist Active", "bigFont.fnt");
             lbl->setID("frame-assist-label");
             lbl->setScale(0.3f);
             lbl->setOpacity(170);
@@ -220,16 +192,6 @@ class $modify(FAPlayLayer, PlayLayer) {
             lbl->setPosition({win.width / 2.f, win.height - 4.f});
             lbl->setZOrder(1000);
             this->addChild(lbl);
-
-            auto dbg = CCLabelBMFont::create(showHud() ? "esperando" : "", "bigFont.fnt");
-            dbg->setID("frame-assist-dbg");
-            dbg->setScale(0.25f);
-            dbg->setOpacity(200);
-            dbg->setColor({255, 220, 90});
-            dbg->setAnchorPoint({0.5f, 1.f});
-            dbg->setPosition({win.width / 2.f, win.height - 18.f});
-            dbg->setZOrder(1000);
-            this->addChild(dbg);
         }
     }
 
@@ -247,7 +209,6 @@ class $modify(FAPlayLayer, PlayLayer) {
         }
 
         if (g_snaps.empty()) {
-            setDbg("sin snapshots");
             return PlayLayer::destroyPlayer(player, obj);
         }
 
@@ -262,7 +223,6 @@ class $modify(FAPlayLayer, PlayLayer) {
                 if (deathStep - e.step <= 120) last = &e;
             }
             if (!last) {
-                setDbg("sin click cercano");
                 return PlayLayer::destroyPlayer(player, obj);
             }
             clickStep = last->step;
@@ -295,12 +255,9 @@ class $modify(FAPlayLayer, PlayLayer) {
         }
 
         if (!ok) {
-            setDbg("sin solucion");
             clearAll();
             return PlayLayer::destroyPlayer(player, obj);
         }
-
-        setDbg("reintentando salto");
 
         int origUp = -1, nextDown = -1;
         for (auto& e : g_events) {
@@ -312,7 +269,6 @@ class $modify(FAPlayLayer, PlayLayer) {
         CheckpointObject* target = nullptr;
         for (auto& s : g_snaps) if (s.step == snapStep) target = s.cp;
         if (!target) {
-            setDbg("checkpoint no hallado");
             return PlayLayer::destroyPlayer(player, obj);
         }
 
